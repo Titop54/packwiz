@@ -15,6 +15,22 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        
+      - name: Sync with Upstream
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git remote add upstream https://github.com/packwiz/packwiz.git
+          git fetch upstream
+          
+          if git merge upstream/main --no-edit; then
+            printf "[+] Successfully synced with upstream!"
+            git push origin main
+          else
+            printf "[!] Conflict detected during sync."
+            git merge --abort
+          fi
 
       - name: Setup Go
         uses: actions/setup-go@v5
