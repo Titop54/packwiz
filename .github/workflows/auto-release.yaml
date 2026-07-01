@@ -24,7 +24,7 @@ jobs:
           git remote add upstream https://github.com/packwiz/packwiz.git
           git fetch upstream
           
-          if git merge upstream/main --no-edit; then
+          if git merge upstream/main --allow-unrelated-histories --no-edit; then
             printf "[+] Successfully synced with upstream!"
             git push origin main
           else
