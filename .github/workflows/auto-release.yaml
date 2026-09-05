@@ -1,0 +1,73 @@
+name: Compile and Release
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build Packwiz
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Sync with Upstream
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git remote add upstream https://github.com/packwiz/packwiz.git
+          git fetch upstream
+
+          if [ -f .github/workflows/auto-release.yaml ]; then
+            cp .github/workflows/auto-release.yaml /tmp/auto-release.yaml
+          fi
+          
+          if git merge upstream/main --no-commit --allow-unrelated-histories --no-ff -Xtheirs; then
+            if [ -f /tmp/auto-release.yaml ]; then
+              cp /tmp/auto-release.yaml .github/workflows/auto-release.yaml
+              git add .github/workflows/auto-release.yaml
+            fi
+            printf "[+] Successfully synced with upstream!"
+            git push origin main
+          else
+            printf "[!] Conflict detected during sync."
+            git merge --abort
+            exit 1
+          fi
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Compile Binaries
+        run: |
+          mkdir -p dist
+          
+          GOOS=windows GOARCH=amd64 go build -o dist/packwiz.exe
+          cd dist && zip packwiz-windows.zip packwiz.exe && rm packwiz.exe && cd ..
+          
+          GOOS=linux GOARCH=amd64 go build -o dist/packwiz
+          cd dist && zip packwiz-linux.zip packwiz && rm packwiz && cd ..
+          
+          GOOS=darwin GOARCH=amd64 go build -o dist/packwiz-macos-intel
+          cd dist && zip packwiz-macos.zip packwiz-macos-intel && rm packwiz-macos-intel && cd ..
+
+      - name: Create or Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Packwiz Build"
+          body: "Automated build of Packwiz. Updated on ${{ github.event.repository.updated_at }}"
+          draft: false
+          prerelease: false
+          files: |
+            dist/packwiz-windows.zip
+            dist/packwiz-linux.zip
+            dist/packwiz-macos.zip
